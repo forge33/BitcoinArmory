@@ -1,6 +1,6 @@
-from PyQt4.Qt import *
-from PyQt4.QtGui import *
-from PyQt4.QtNetwork import *
+from PyQt5.Qt import *
+from PyQt5.QtGui import *
+from PyQt5.QtNetwork import *
 from qtdefines import *
 from qtdialogs import createAddrBookButton, DlgSetComment, DlgSendBitcoins, \
                       DlgUnlockWallet, DlgQRCodeDisplay, DlgRequestPayment
@@ -31,7 +31,7 @@ class DlgConstructTx(ArmoryDialog):
 
    #############################################################################
    def __init__(self, parent, main, prefill=None):
-      super(DlgConstructTx, self).__init__(parent, main)
+      super().__init__(parent, main)
 
       if prefill is None:
          prefill = UnsignedTransaction()
