@@ -96,6 +96,7 @@ import decimal
 from inspect import *
 import json
 import sys
+import os
 
 from twisted.cred.checkers import FilePasswordDB
 from twisted.internet import reactor
@@ -576,6 +577,53 @@ class Armory_Json_Rpc_Server(jsonrpc.JSONRPC):
       return utxoDict
 
 
+   def jsonrpc_importlockbox(self, *lbParts):
+      importedLockbox = None
+
+      asciiLockbox = "\n".join(lbParts)
+      asciiLockbox = asciiLockbox.strip()
+      try:
+         importedLockbox = MultiSigLockbox().unserializeAscii(asciiLockbox)
+      except:
+         return 'Error unserializing the entered text'
+
+      def updateOrAddLockbox(lbObj, isFresh=False):
+         ret = ''
+         try:
+            lbID = lbObj.uniqueIDB58
+            if not lbID in self.serverLBMap.keys():
+               # Add new lockbox to list
+               #self.allLockboxes.append(lbObj)
+               #self.lockboxIDMap[lbID] = len(self.allLockboxes)-1
+
+               scraddrReg = script_to_scrAddr(lbObj.binScript)
+               scraddrP2SH = script_to_scrAddr(script_to_p2sh_script(lbObj.binScript))
+               scrAddrList = []
+               scrAddrList.append(scraddrReg)
+               scrAddrList.append(scraddrP2SH)
+               #self.cppLockboxWltMap[lbID] = \
+               lbObj.registerLockbox(scrAddrList, isFresh)
+
+               ret = 'Added Lockbox ' + lbID
+               print(ret)
+
+            else:
+               ret = 'Lockbox ' + lbID + ' already exists.'
+               print(ret)
+
+            lbFileName = 'multisigs.txt'
+            lbFilePath = os.path.join(self.armoryHomeDir, lbFileName)
+            self.serverLBMap[lbID] = lbObj
+            self.serverLBCppWalletMap[lbID] = lbObj
+            writeLockboxesFile(self.serverLBMap.values(), lbFilePath)
+
+            return ret
+         except:
+            return 'Failed to add/update lockbox'
+
+      return updateOrAddLockbox( importedLockbox )
+
+
    #############################################################################
    @catchErrsForJSON
    def jsonrpc_importprivkey(self, privKey):
@@ -962,6 +1010,31 @@ class Armory_Json_Rpc_Server(jsonrpc.JSONRPC):
             retVal = AmountToJSON(self.curWlt.getBalance(baltype))
       else:
          raise BlockchainNotReady('Wallet is not loaded yet.')
+
+      return retVal
+
+   #############################################################################
+   @catchErrsForJSON
+   def jsonrpc_getlockboxbalance(self):
+      """
+      DESCRIPTION:
+      Get the balance of the currently loaded lockbox.
+      PARAMETERS:
+      baltype - (Default=spendable) A string indicating the balance type to
+                retrieve from the current lockbox.
+      RETURN:
+      The current lockbox balance (BTC), or -1 if an error occurred.
+      """
+
+      retVal = -1
+
+      # Proceed only if the blockchain's good. Lockbox value could be unreliable
+      # otherwise.
+      if TheBDM.getState()==BDM_BLOCKCHAIN_READY:
+         cppLockbox = self.serverLBCppWalletMap[self.curLB.uniqueIDB58]
+         retVal = AmountToJSON(cppLockbox.getSpendableBalance())
+      else:
+         raise BlockchainNotReady('Lockbox is not loaded yet.')
 
       return retVal
 
@@ -2378,6 +2451,34 @@ class Armory_Json_Rpc_Server(jsonrpc.JSONRPC):
 
       return retStr
 
+
+
+   def jsonrpc_getlockbox(self, lbIDs):
+      ret = ''
+      lbIDsList = lbIDs.split(":")
+
+
+      # Write the function that will dump the lockboxes to the json returned.
+      def getLockboxes(lockboxes):
+         lbList = {}
+         for curLB in lockboxes:
+            lbList[curLB] = self.serverLBMap[curLB].serializeAscii()
+         return lbList
+
+      # Do these lockboxes actually exist? If not, let the user know and bail.
+      allLBsValid = True
+      for curLB in lbIDsList:
+         if not curLB in self.serverLBMap.keys():
+            LOGERROR('Lockbox %s does not exist! Exiting.' % curLB)
+            allLBsValid = False
+            ret = 'getLockbox command failed. Lockbox %s does not exist.' % curLB
+            break
+
+      # Send the lockbox notifications if all the lockboxes exist.
+      if allLBsValid:
+         ret = getLockboxes(lbIDsList)
+
+      return ret
 
    #############################################################################
    # Send ASCII-encoded lockboxes to recipients via e-mail. For now, only
