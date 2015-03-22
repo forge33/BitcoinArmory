@@ -576,8 +576,17 @@ class Armory_Json_Rpc_Server(jsonrpc.JSONRPC):
 
       return utxoDict
 
-
+   #############################################################################
+   # Import a Ascii-encoded lockbox
    def jsonrpc_importlockbox(self, *lbParts):
+      """
+      DESCRIPTION:
+      Import an Ascii-encoded lockbox.
+      PARAMETERS:
+      lbParts - Ascii-encoded Lockbox.
+      RETURN:
+      None.
+      """
       importedLockbox = None
 
       asciiLockbox = "\n".join(lbParts)
@@ -2452,8 +2461,21 @@ class Armory_Json_Rpc_Server(jsonrpc.JSONRPC):
       return retStr
 
 
-
+   #############################################################################
+   # Export ASCII-encoded lockboxes to the caller. For now, only
+   # lockboxes from ArmoryQt's master list (multisigs.txt) or from the Armory
+   # home directory will be searched.
    def jsonrpc_getlockbox(self, lbIDs):
+      """
+      DESCRIPTION:
+      Return lockboxes to caller.
+      PARAMETERS:
+      lbIDs - A colon-delineated list of Base58 IDs of lockboxes to send to an
+              email recipient.
+
+      RETURN:
+      An array of Lockbox ASCII-encoded if successful.
+      """
       ret = ''
       lbIDsList = lbIDs.split(":")
 
